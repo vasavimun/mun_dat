@@ -177,6 +177,10 @@ app.get("/groups", async (req, res) => {
 });
 
 
+app.get("/health", (req, res) => {
+  return res.json({ message: "Working" });
+});
+
 // 🔹 Handle Vercel's serverless functions
 module.exports = app;
 
