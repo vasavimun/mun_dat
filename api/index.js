@@ -15,35 +15,80 @@ if (!uri) {
   process.exit(1);
 }
 
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
+// const client = new MongoClient(uri, {
+//   serverApi: {
+//     version: ServerApiVersion.v1,
+//     strict: true,
+//     deprecationErrors: true,
+//   },
+// });
 
-async function connectToMongoDB() {
-  try {
-    await client.connect();
-    console.log("✅ Connected to MongoDB!");
-  } catch (error) {
-    console.error("❌ Failed to connect to MongoDB", error);
-    process.exit(1);
-  }
+// async function connectToMongoDB() {
+//   try {
+//     await client.connect();
+//     console.log("✅ Connected to MongoDB!");
+//   } catch (error) {
+//     console.error("❌ Failed to connect to MongoDB", error);
+//     process.exit(1);
+//   }
+// }
+
+// connectToMongoDB();
+
+// // Dynamic collection reference (ensures fresh connections)
+// function getCollections() {
+//   const database = client.db("MUN");
+//   return {
+//     registrationsCollection: database.collection("Registrations"),
+//     upiCollection: database.collection("UPI_IDs"),
+//     groupCollection: database.collection("Groups"),
+//   };
+// }
+
+let client;
+let clientPromise;
+
+if (!process.env.DATABASE) {
+  console.error("Missing DATABASE environment variable");
+  process.exit(1);
 }
 
-connectToMongoDB();
+if (process.env.NODE_ENV === "development") {
+  // In development mode, use a global variable so that the value
+  // is preserved across module reloads caused by HMR (Hot Module Replacement).
+  if (!global._mongoClientPromise) {
+    client = new MongoClient(process.env.DATABASE, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
+    global._mongoClientPromise = client.connect();
+  }
+  clientPromise = global._mongoClientPromise;
+} else {
+  // In production mode, it's best to not use a global variable.
+  client = new MongoClient(process.env.DATABASE, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
+  });
+  clientPromise = client.connect();
+}
 
-// Dynamic collection reference (ensures fresh connections)
-function getCollections() {
-  const database = client.db("MUN");
+async function getCollections() {
+  const connectedClient = await clientPromise;
+  const database = connectedClient.db("MUN");
   return {
     registrationsCollection: database.collection("Registrations"),
     upiCollection: database.collection("UPI_IDs"),
     groupCollection: database.collection("Groups"),
   };
 }
+
 
 // 🔹 Insert new UPI IDs
 app.post("/upi/add", async (req, res) => {
@@ -62,7 +107,8 @@ app.post("/upi/add", async (req, res) => {
 // 🔹 Get all registrations
 app.get("/registrations", async (req, res) => {
   try {
-    const { registrationsCollection } = getCollections();
+    // Add "await" here
+    const { registrationsCollection } = await getCollections();
     const registrations = await registrationsCollection.find({}).toArray();
     res.json(registrations);
   } catch (error) {
