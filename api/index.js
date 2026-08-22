@@ -177,6 +177,10 @@ app.get("/groups", async (req, res) => {
 });
 
 
+app.get("/", (req, res)=>{
+  return res.json({"message": "MUN server is up and running"})
+})
+
 app.get("/health", (req, res) => {
   return res.json({ message: "Working" });
 });
