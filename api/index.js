@@ -99,18 +99,13 @@ app.get("/upi/available", async (req, res) => {
   }
 });
 
-// 🔹 Register a new user and update UPI count
+// 🔹 Register a new user
 app.post("/register", async (req, res) => {
   try {
-    const { registrationsCollection, upiCollection } = await getCollections();
+    const { registrationsCollection } = await getCollections();
     const registrationData = req.body;
-    const { upiData } = registrationData;
-
-    const upi = await upiCollection.findOne({ upiData });
-    if (!upi) return res.status(400).json({ error: "UPI ID not found" });
 
     await registrationsCollection.insertOne(registrationData);
-    await upiCollection.updateOne({ upiData }, { $inc: { count: 1 } });
 
     res.status(201).json({ message: "Registration successful" });
   } catch (error) {
