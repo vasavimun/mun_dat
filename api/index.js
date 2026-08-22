@@ -6,56 +6,19 @@ require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors({ origin: '*' }));
+app.use(cors({ origin: "*" }));
 app.use(express.json());
-
-const uri = process.env.DATABASE;
-if (!uri) {
-  console.error("Missing DATABASE environment variable");
-  process.exit(1);
-}
-
-// const client = new MongoClient(uri, {
-//   serverApi: {
-//     version: ServerApiVersion.v1,
-//     strict: true,
-//     deprecationErrors: true,
-//   },
-// });
-
-// async function connectToMongoDB() {
-//   try {
-//     await client.connect();
-//     console.log("✅ Connected to MongoDB!");
-//   } catch (error) {
-//     console.error("❌ Failed to connect to MongoDB", error);
-//     process.exit(1);
-//   }
-// }
-
-// connectToMongoDB();
-
-// // Dynamic collection reference (ensures fresh connections)
-// function getCollections() {
-//   const database = client.db("MUN");
-//   return {
-//     registrationsCollection: database.collection("Registrations"),
-//     upiCollection: database.collection("UPI_IDs"),
-//     groupCollection: database.collection("Groups"),
-//   };
-// }
-
-let client;
-let clientPromise;
 
 if (!process.env.DATABASE) {
   console.error("Missing DATABASE environment variable");
   process.exit(1);
 }
 
+let client;
+let clientPromise;
+
 if (process.env.NODE_ENV === "development") {
-  // In development mode, use a global variable so that the value
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
+  // Preserve the connection across module reloads in dev (HMR)
   if (!global._mongoClientPromise) {
     client = new MongoClient(process.env.DATABASE, {
       serverApi: {
@@ -68,7 +31,6 @@ if (process.env.NODE_ENV === "development") {
   }
   clientPromise = global._mongoClientPromise;
 } else {
-  // In production mode, it's best to not use a global variable.
   client = new MongoClient(process.env.DATABASE, {
     serverApi: {
       version: ServerApiVersion.v1,
@@ -89,13 +51,12 @@ async function getCollections() {
   };
 }
 
-
 // 🔹 Insert new UPI IDs
 app.post("/upi/add", async (req, res) => {
   try {
-    const { upiCollection } = getCollections();
+    const { upiCollection } = await getCollections();
     const { upiData, recipient } = req.body;
-    
+
     const result = await upiCollection.insertOne({ upiData, recipient, count: 0 });
     res.status(201).json({ message: "UPI ID added successfully", id: result.insertedId });
   } catch (error) {
@@ -107,7 +68,6 @@ app.post("/upi/add", async (req, res) => {
 // 🔹 Get all registrations
 app.get("/registrations", async (req, res) => {
   try {
-    // Add "await" here
     const { registrationsCollection } = await getCollections();
     const registrations = await registrationsCollection.find({}).toArray();
     res.json(registrations);
@@ -120,12 +80,16 @@ app.get("/registrations", async (req, res) => {
 // 🔹 Get an available UPI ID (count < 20)
 app.get("/upi/available", async (req, res) => {
   try {
-    const { upiCollection } = getCollections();
+    const { upiCollection } = await getCollections();
     let upi = await upiCollection.findOne({ count: { $lt: 20 } });
 
     if (!upi) {
       await upiCollection.updateMany({}, { $set: { count: 0 } });
       upi = await upiCollection.findOne({});
+    }
+
+    if (!upi) {
+      return res.status(404).json({ error: "No UPI IDs configured" });
     }
 
     res.json(upi);
@@ -138,7 +102,7 @@ app.get("/upi/available", async (req, res) => {
 // 🔹 Register a new user and update UPI count
 app.post("/register", async (req, res) => {
   try {
-    const { registrationsCollection, upiCollection } = getCollections();
+    const { registrationsCollection, upiCollection } = await getCollections();
     const registrationData = req.body;
     const { upiData } = registrationData;
 
@@ -154,32 +118,33 @@ app.post("/register", async (req, res) => {
     res.status(500).json({ error: "Error registering user" });
   }
 });
+
 app.post("/groupregister", async (req, res) => {
-  try{
+  try {
     const registerdata = req.body;
-    const { groupCollection } = getCollections();
+    const { groupCollection } = await getCollections();
     await groupCollection.insertOne(registerdata);
     res.status(201).json({ message: "Group Registration successful" });
   } catch (error) {
-    console.error("Error registering user:", error);
-    res.status(500).json({ error: "Error registering user" });
+    console.error("Error registering group:", error);
+    res.status(500).json({ error: "Error registering group" });
   }
 });
+
 app.get("/groups", async (req, res) => {
   try {
-    const { groupCollection } = getCollections();
+    const { groupCollection } = await getCollections();
     const groups = await groupCollection.find({}).toArray();
     res.json(groups);
   } catch (error) {
-    console.error("Error fetching registrations:", error);
-    res.status(500).json({ error: "Error fetching registrations" });
+    console.error("Error fetching groups:", error);
+    res.status(500).json({ error: "Error fetching groups" });
   }
 });
 
-
-app.get("/", (req, res)=>{
-  return res.json({"message": "MUN server is up and running"})
-})
+app.get("/", (req, res) => {
+  return res.json({ message: "MUN server is up and running" });
+});
 
 app.get("/health", (req, res) => {
   return res.json({ message: "Working" });
