@@ -88,10 +88,18 @@ app.get("/upi/available", async (req, res) => {
 // 🔹 Register a new user
 app.post("/register", async (req, res) => {
   try {
-    const { registrationsCollection } = await getCollections();
+    const { registrationsCollection, upiCollection } = await getCollections();
     const registrationData = req.body;
 
     await registrationsCollection.insertOne(registrationData);
+
+    // Increment transaction count for the UPI ID used
+    if (registrationData.usedUpiId) {
+      await upiCollection.updateOne(
+        { upiData: registrationData.usedUpiId },
+        { $inc: { count: 1 } }
+      );
+    }
 
     res.status(201).json({ message: "Registration successful" });
   } catch (error) {
@@ -99,6 +107,7 @@ app.post("/register", async (req, res) => {
     res.status(500).json({ error: "Error registering user" });
   }
 });
+
 
 app.post("/groupregister", async (req, res) => {
   try {
