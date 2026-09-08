@@ -122,7 +122,7 @@ app.post("/groupregister", async (req, res) => {
     res.status(201).json({ message: "Group Registration successful" });
   } catch (error) {
     console.error("Error registering group:", error);
-    res.status(500).json({ error: "Error registering group" });
+    res.status(500).json({ error: "Error registering group", msg: error });
   }
 });
 
