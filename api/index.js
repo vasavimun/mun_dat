@@ -126,6 +126,8 @@ app.post("/groupregister", async (req, res) => {
   }
 });
 
+//test
+
 app.get("/groups", async (req, res) => {
   try {
     const { groupCollection } = await getCollections();
