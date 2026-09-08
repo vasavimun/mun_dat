@@ -17,29 +17,15 @@ if (!process.env.DATABASE) {
 let client;
 let clientPromise;
 
-if (process.env.NODE_ENV === "development") {
-  // Preserve the connection across module reloads in dev (HMR)
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(process.env.DATABASE, {
-      serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-      },
-    });
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
+if (!global._mongoClientPromise) {
   client = new MongoClient(process.env.DATABASE, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    },
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
   });
-  clientPromise = client.connect();
+  global._mongoClientPromise = client.connect();
 }
+clientPromise = global._mongoClientPromise;
 
 async function getCollections() {
   const connectedClient = await clientPromise;
