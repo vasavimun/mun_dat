@@ -63,23 +63,19 @@ app.get("/registrations", async (req, res) => {
   }
 });
 
-// 🔹 Get an available UPI ID (count < 20)
+// 🔹 Get an available UPI ID (rotates every 20 completed registrations)
 app.get("/upi/available", async (req, res) => {
   try {
-    const { upiCollection } = await getCollections();
-    let upi = await upiCollection.findOne(
-      { count: { $lt: 20 } },
-      { sort: { _id: 1}}
-    );
+    const { registrationsCollection, upiCollection } = await getCollections();
 
-    if (!upi) {
-      await upiCollection.updateMany({}, { $set: { count: 0 } });
-      upi = await upiCollection.findOne({}, {sort: {_id:1}});
-    }
-
-    if (!upi) {
+    const upiDocs = await upiCollection.find({}).sort({ _id: 1 }).toArray();
+    if (!upiDocs.length) {
       return res.status(404).json({ error: "No UPI IDs configured" });
     }
+
+    const totalRegistrations = await registrationsCollection.countDocuments({});
+    const index = Math.floor(totalRegistrations / 20) % upiDocs.length;
+    const upi = upiDocs[index];
 
     res.json(upi);
   } catch (error) {
@@ -91,18 +87,10 @@ app.get("/upi/available", async (req, res) => {
 // 🔹 Register a new user
 app.post("/register", async (req, res) => {
   try {
-    const { registrationsCollection, upiCollection } = await getCollections();
+    const { registrationsCollection } = await getCollections();
     const registrationData = req.body;
 
     await registrationsCollection.insertOne(registrationData);
-
-    // Increment transaction count for the UPI ID used
-    if (registrationData.usedUpiId) {
-      await upiCollection.updateOne(
-        { upiData: registrationData.usedUpiId },
-        { $inc: { count: 1 } }
-      );
-    }
 
     res.status(201).json({ message: "Registration successful" });
   } catch (error) {
