@@ -67,11 +67,14 @@ app.get("/registrations", async (req, res) => {
 app.get("/upi/available", async (req, res) => {
   try {
     const { upiCollection } = await getCollections();
-    let upi = await upiCollection.findOne({ count: { $lt: 20 } });
+    let upi = await upiCollection.findOne(
+      { count: { $lt: 20 } },
+      { sort: { _id: 1}}
+    );
 
     if (!upi) {
       await upiCollection.updateMany({}, { $set: { count: 0 } });
-      upi = await upiCollection.findOne({});
+      upi = await upiCollection.findOne({}, {sort: {_id:1}});
     }
 
     if (!upi) {
