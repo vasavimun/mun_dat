@@ -51,17 +51,121 @@ app.post("/upi/add", async (req, res) => {
   }
 });
 
-// 🔹 Get all registrations
+// 🔹 Get all registrations 
 app.get("/registrations", async (req, res) => {
   try {
     const { registrationsCollection } = await getCollections();
     const registrations = await registrationsCollection.find({}).toArray();
-    res.json(registrations);
+
+    const columns = [
+      "name",
+      "phone",
+      "email",
+      "instituteName",
+      "rollNumber",
+      "year",
+      "branch",
+      "section",
+      "labBatch",
+      "eca",
+      "preference1",
+      "preference2",
+      "preference3",
+      "ipRole1",
+      "ipRole2",
+      "ipRole3",
+      "transactionId",
+      "utrNumber",
+      "isVasavi"
+    ];
+
+    const tableRows = registrations.map((registration) => `
+      <tr>
+        ${columns.map(column => `
+          <td>${registration[column] ?? ""}</td>
+        `).join("")}
+      </tr>
+    `).join("");
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Registrations</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+          }
+
+          h1 {
+            margin-bottom: 20px;
+          }
+
+          .table-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1500px;
+          }
+
+          th, td {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+            white-space: nowrap;
+          }
+
+          th {
+            background: #222;
+            color: white;
+            position: sticky;
+            top: 0;
+          }
+
+          tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+
+          tr:hover {
+            background: #eef;
+          }
+        </style>
+      </head>
+
+      <body>
+        <h1>Registrations (${registrations.length})</h1>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                ${columns.map(column => `<th>${column}</th>`).join("")}
+              </tr>
+            </thead>
+
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+      </body>
+      </html>
+    `);
+
   } catch (error) {
     console.error("Error fetching registrations:", error);
-    res.status(500).json({ msg: "Error fetching registrations", error: error });
+    res.status(500).send("Error fetching registrations");
   }
 });
+
 
 // 🔹 Get an available UPI ID (rotates every 20 completed registrations)
 app.get("/upi/available", async (req, res) => {
