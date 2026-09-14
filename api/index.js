@@ -55,117 +55,244 @@ app.post("/upi/add", async (req, res) => {
 app.get("/registrations", async (req, res) => {
   try {
     const { registrationsCollection } = await getCollections();
+
     const registrations = await registrationsCollection.find({}).toArray();
 
+    // Get EVERY field from every document
     const columns = [
-      "name",
-      "phone",
-      "email",
-      "instituteName",
-      "rollNumber",
-      "year",
-      "branch",
-      "section",
-      "labBatch",
-      "eca",
-      "preference1",
-      "preference2",
-      "preference3",
-      "ipRole1",
-      "ipRole2",
-      "ipRole3",
-      "transactionId",
-      "utrNumber",
-      "isVasavi"
+      ...new Set(
+        registrations.flatMap((registration) =>
+          Object.keys(registration)
+        )
+      )
     ];
 
-    const tableRows = registrations.map((registration) => `
-      <tr>
-        ${columns.map(column => `
-          <td>${registration[column] ?? ""}</td>
-        `).join("")}
-      </tr>
-    `).join("");
+    const escapeHtml = (value) => {
+      if (value === null || value === undefined) return "";
+
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
+    const formatValue = (value, field) => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+
+      // Google Drive link
+      if (field === "driveLink" && value) {
+        return `
+          <a
+            href="${escapeHtml(value)}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open Drive
+          </a>
+        `;
+      }
+
+      // Handle arrays
+      if (Array.isArray(value)) {
+        return escapeHtml(value.join(", "));
+      }
+
+      // Handle objects such as MongoDB ObjectId
+      if (typeof value === "object") {
+        return escapeHtml(JSON.stringify(value));
+      }
+
+      // Handle boolean
+      if (typeof value === "boolean") {
+        return value ? "true" : "false";
+      }
+
+      return escapeHtml(value);
+    };
+
+    const tableRows = registrations
+      .map(
+        (registration) => `
+          <tr>
+            ${columns
+              .map(
+                (column) => `
+                  <td>
+                    ${formatValue(registration[column], column)}
+                  </td>
+                `
+              )
+              .join("")}
+          </tr>
+        `
+      )
+      .join("");
 
     res.send(`
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
+
         <title>Registrations</title>
+
         <style>
+          * {
+            box-sizing: border-box;
+          }
+
           body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background: #f5f5f5;
           }
 
           h1 {
-            margin-bottom: 20px;
+            margin: 0 0 20px 0;
+          }
+
+          .count {
+            color: #666;
+            margin-bottom: 15px;
           }
 
           .table-container {
+            width: 100%;
             overflow-x: auto;
+            overflow-y: auto;
+            max-height: 80vh;
+
             background: white;
+
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+
+            box-shadow:
+              0 2px 10px rgba(0, 0, 0, 0.1);
           }
 
           table {
-            width: 100%;
             border-collapse: collapse;
-            min-width: 1500px;
+            width: max-content;
+            min-width: 100%;
           }
 
-          th, td {
-            padding: 10px 12px;
+          th,
+          td {
+            padding: 10px 14px;
+
             border: 1px solid #ddd;
+
             text-align: left;
+
             white-space: nowrap;
+
+            max-width: 400px;
           }
 
           th {
             background: #222;
             color: white;
+
             position: sticky;
             top: 0;
+
+            z-index: 10;
+
+            font-weight: 600;
           }
 
           tr:nth-child(even) {
-            background: #f9f9f9;
+            background: #fafafa;
           }
 
           tr:hover {
-            background: #eef;
+            background: #eef3ff;
+          }
+
+          td {
+            vertical-align: top;
+          }
+
+          a {
+            color: #1a73e8;
+            font-weight: bold;
+            text-decoration: none;
+          }
+
+          a:hover {
+            text-decoration: underline;
+          }
+
+          .empty {
+            color: #aaa;
           }
         </style>
       </head>
 
       <body>
-        <h1>Registrations (${registrations.length})</h1>
+
+        <h1>Registrations</h1>
+
+        <div class="count">
+          Total registrations: ${registrations.length}
+          &nbsp; | &nbsp;
+          Total fields: ${columns.length}
+        </div>
 
         <div class="table-container">
+
           <table>
+
             <thead>
               <tr>
-                ${columns.map(column => `<th>${column}</th>`).join("")}
+                ${columns
+                  .map(
+                    (column) => `
+                      <th>${escapeHtml(column)}</th>
+                    `
+                  )
+                  .join("")}
               </tr>
             </thead>
 
             <tbody>
-              ${tableRows}
+
+              ${
+                registrations.length
+                  ? tableRows
+                  : `
+                    <tr>
+                      <td colspan="${columns.length}">
+                        No registrations found
+                      </td>
+                    </tr>
+                  `
+              }
+
             </tbody>
+
           </table>
+
         </div>
+
       </body>
       </html>
     `);
 
   } catch (error) {
     console.error("Error fetching registrations:", error);
-    res.status(500).send("Error fetching registrations");
+
+    res.status(500).send(`
+      <h1>Error fetching registrations</h1>
+      <pre>${error.message}</pre>
+    `);
   }
 });
-
 
 // 🔹 Get an available UPI ID (rotates every 20 completed registrations)
 app.get("/upi/available", async (req, res) => {
