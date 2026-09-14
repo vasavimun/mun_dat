@@ -184,25 +184,20 @@ app.get("/registrations", async (req, res) => {
           th,
           td {
             padding: 10px 14px;
-
             border: 1px solid #ddd;
-
             text-align: left;
-
-            white-space: nowrap;
-
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             max-width: 400px;
           }
 
           th {
             background: #222;
             color: white;
-
             position: sticky;
             top: 0;
-
             z-index: 10;
-
             font-weight: 600;
           }
 
