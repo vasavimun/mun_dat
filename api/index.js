@@ -59,7 +59,7 @@ app.get("/registrations", async (req, res) => {
     res.json(registrations);
   } catch (error) {
     console.error("Error fetching registrations:", error);
-    res.status(500).json({ error: "Error fetching registrations" });
+    res.status(500).json({ msg: "Error fetching registrations", error: error });
   }
 });
 
